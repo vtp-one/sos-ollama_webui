@@ -1,0 +1,260 @@
+meta:
+  sos_version: v0.0.1
+  system_name: sos-ollama_webui
+  system_version: v0.0.1
+  system_internal: internal
+  system_description: Open WebUI is an extensible, feature-rich, and user-friendly self-hosted WebUI designed to operate entirely offline. It supports various LLM runners, including Ollama and OpenAI-compatible APIs. For more information, be sure to check out our Open WebUI Documentation.
+  profile: default
+
+namespace:
+  model_list: null
+
+  frontend_image: ghcr.io/open-webui/open-webui:main
+
+  ollama_namespace:
+    model_dir: /tmp/ollama_data
+    host: 0.0.0.0
+    port: "11434"
+
+    run_env:
+      OLLAMA_MAX_LOADED_MODELS: 4
+      OLLAMA_NUM_PARALLEL: 4
+      OLLAMA_MAX_QUEUE: 20
+      OLLAMA_NOPRUNE: True
+      OLLAMA_KEEP_ALIVE: -1
+      OLLAMA_LLAMA_EXTRA_ARGS: --fa
+
+  runtime:
+    compose_file: docker-compose.yaml
+    host: 0.0.0.0
+    port: "3000"
+
+service:
+  local_data:
+    namespace:
+      target: local_data
+
+  ollama: True
+
+action:
+  sos_help:
+    label: print help
+    tool: terminal.print_object
+    params:
+      horizontal_rule: True
+      obj:
+        - SOS-Nano_LLM_Studio: ${meta.system_description}
+        - Install:
+          - sos-toolkit setup
+          - sos-toolkit install
+        - Run:
+          - sos-toolkit up
+        - Stop:
+          - sos-toolkit down
+        - Config:
+          - Change Ollama Model Directory: sos-toolkit config --target service.ollama.data
+
+  sos_setup:
+    ollama_setup: ${service.ollama.action.setup}
+    local_data: ${service.local_data.action.setup}
+
+    ollama_data:
+      local_target:
+        label: generate ollama data directory
+        tool: context.ctx_set
+        params:
+          ctx_key: __TARGET__
+          overwrite: True
+        context_map:
+          - label: generate create_child target
+            result: obj
+            data:
+              - target: folder
+                source: null
+                default: ollama_data
+              - target: name
+                source: null
+                default: ollama_data
+      create_child: ${service.local_data.action.create_child}
+      update_ollama_data:
+        label: set ollama service data directory
+        tool: context.ctx_set
+        params:
+          ctx_key: service.ollama.namespace.model_dir
+          overwrite: True
+        context_map:
+          - label: get model_dir
+            result: obj
+            data: service.local_data.namespace.child_map.ollama_data
+
+  sos_install:
+    pull_frontend_image:
+      image_exists:
+        tool: docker.image_exists
+        context_map:
+          - label: get image tag
+            result: target
+            data: namespace.frontend_image
+        result_map:
+          - label: set image exists result
+            result: __TARGET__
+            data: result
+
+      pull_image:
+        tool: docker.image_load
+        params:
+          source: registry
+        context_map:
+          - label: get image tag
+            result: target
+            data: namespace.frontend_image
+        condition:
+          - label: if image does not exist
+            ctx_key: __TARGET__
+            valid: False
+            comparison: equal
+            raise_exc: False
+
+    download_models: ${action.download_models}
+
+  sos_up:
+    ollama_up: ${service.ollama.action.up}
+
+    docker_compose:
+      label: docker compose up
+      tool: docker.compose_up
+      context_map:
+        - label: get profile
+          result: profile
+          data: meta.profile
+        - label: generate compose file target
+          result: file
+          data:
+            - target: system_path
+              source: meta.system_path
+            - target: compose_file
+              source: namespace.runtime.compose_file
+              default: docker-compose.yaml
+          path_join: True
+        - label: get project name
+          result: project_name
+          data: meta.system_name
+        - label: generate env_map
+          result: env_map
+          data:
+            - target: FRONTEND_IMAGE
+              source: namespace.frontend_image
+            - target: SYSTEM_NAME
+              source: meta.system_name
+            - target: SYSTEM_VERSION
+              source: meta.system_version
+            - target: OLLAMA_NETWORK
+              source: service.ollama.namespace.network_name
+            - target: LOCAL_DATA_PATH
+              source: service.local_data.namespace.path
+              default: /tmp/${meta.system_name}
+            - target: FRONTEND_PORT
+              source: namespace.runtime.port
+            - target: OLLAMA_BASE_URL
+              source: service.ollama.namespace.base_url
+
+    service_address:
+      tool: terminal.print_object
+      params:
+        horizontal_rule: True
+      context_map:
+        - label: generate service address
+          result: obj
+          data:
+            - source: null
+              target: preamble
+              default: "OLLAMA-WEBUI RUNNING ON:"
+            - source: null
+              target: protocol
+              default: http
+            - source: namespace.runtime.host
+              target: host
+            - source: namespace.runtime.port
+              target: port
+          format_string: "{preamble} {protocol}://{host}:{port}"
+
+  sos_down:
+    compose:
+      label: docker compose down
+      tool: docker.compose_down
+      context_map:
+        - label: get project name
+          result: project_name
+          data: meta.system_name
+
+    ollama_down: ${service.ollama.action.down}
+
+  sos_status:
+    root:
+      label: root git status
+      tool: git.repo_status
+      context_map:
+        - label: get system_path
+          result: working_dir
+          data: meta.system_path
+
+  sos_clean:
+    system_down: ${action.sos_down}
+
+    frontend_image:
+      image_exists:
+        label: check image exists
+        tool: docker.image_exists
+        context_map:
+          - label: get image tag
+            result: target
+            data: namespace.frontend_image
+        result_map:
+          - label: result to __TARGET__
+            result: __TARGET__
+            data: result
+      delete_image:
+        label: delete image if exists
+        tool: docker.image_delete
+        context_map:
+          - label: get image tag
+            result: target
+            data: namespace.frontend_image
+        condition:
+          - label: if image exists
+            ctx_key: __TARGET__
+            valid: True
+            is_inverse: False
+            raise_exc: False
+
+    # TODO
+    # - fix permissions error => need to run ollama service container as non-root
+    #local_data: ${service.local_data.action.clean}
+
+  download_models:
+    model_list:
+      label: model_list break
+      tool: context.runtime_break
+      params:
+        resolve:
+          - label: model_list exists
+            ctx_key: namespace.model_list
+            valid: null
+            is_inverse: True
+            raise_exc: False
+        qualifier: none
+        info_break: NO MODEL_LIST PROVIDED
+        info_pass: DOWNLOADING MODEL_LIST
+    ollama_up: ${service.ollama.action.up}
+    ollama_pull:
+      label: pull required models
+      tool: ollama.download_models
+      context_map:
+        - label: get required model list
+          result: target
+          data: namespace.model_list
+    ollama_down: ${service.ollama.action.down}
+
+hook:
+  on_context_load:
+    ollama_plugin: ${service.ollama.action.plugin}
