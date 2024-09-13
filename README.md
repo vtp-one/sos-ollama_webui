@@ -146,7 +146,7 @@ This needs to be set before we use the install command, otherwise it will use th
 ```
 (sos)$ sos-toolkit config --target ollama_data
 
-Input Location for Ollama Data Directory:
+Set Ollama Data Directory: 
 
 ```
 Enter the target location to persist your Ollama data and press enter. 
