@@ -27,7 +27,7 @@ All Commands in the environment are prefaced with: `(sos)$`
 
 # Current Release Target
 ```
-v0.0.1
+v0.0.2
 ```
 
 
@@ -44,7 +44,7 @@ DO NOT INTERACT WITH SYSTEMS THAT YOU DO NOT KNOW, TRUST, OR HAVE THE CAPABILITY
 
 ### 1. Pull the sos-ollama_webui repository and enter it
 ```
-(sos)$ sos-toolkit pull https://github.com/jk-vtp-one/sos-ollama_webui --remote-branch v0.0.1
+(sos)$ sos-toolkit pull https://github.com/jk-vtp-one/sos-ollama_webui --remote-branch v0.0.2
 (sos)$ cd sos-ollama_webui
 ```
 
