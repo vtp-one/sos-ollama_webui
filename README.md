@@ -144,7 +144,6 @@ It is during this install step that the system uses the SOS-Toolkit Ollama Servi
 The second configuration option is the ability to change the location the SOS-Toolkit Ollama Service uses to store downloaded models. 
 This needs to be set before we use the install command, otherwise it will use the default location.
 ```
-### CURRENTLY NOT WORKING ###
 (sos)$ sos-toolkit config --target ollama_data
 
 Input Location for Ollama Data Directory:
