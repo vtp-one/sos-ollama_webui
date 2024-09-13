@@ -162,6 +162,12 @@ The default storage location is:
 <system_path>/internal/local_data/ollama_data
 ```
 
+It is also possible to use `sos-local.yaml` to pre-set the model data location.
+```
+namespace:
+  ollama_data: <TARGET PATH>
+```
+
 
 After configuring these options, we can install the system.
 ```

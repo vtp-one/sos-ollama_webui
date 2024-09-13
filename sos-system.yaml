@@ -1,28 +1,16 @@
 meta:
   sos_version: v0.0.1
   system_name: sos-ollama_webui
-  system_version: v0.0.1
+  system_version: v0.0.2
   system_internal: internal
   system_description: Open WebUI is an extensible, feature-rich, and user-friendly self-hosted WebUI designed to operate entirely offline. It supports various LLM runners, including Ollama and OpenAI-compatible APIs. For more information, be sure to check out our Open WebUI Documentation.
   profile: default
 
 namespace:
   model_list: null
+  ollama_data: null
 
   frontend_image: ghcr.io/open-webui/open-webui:main
-
-  ollama_namespace:
-    model_dir: /tmp/ollama_data
-    host: 0.0.0.0
-    port: "11434"
-
-    run_env:
-      OLLAMA_MAX_LOADED_MODELS: 4
-      OLLAMA_NUM_PARALLEL: 4
-      OLLAMA_MAX_QUEUE: 20
-      OLLAMA_NOPRUNE: True
-      OLLAMA_KEEP_ALIVE: -1
-      OLLAMA_LLAMA_EXTRA_ARGS: --fa
 
   runtime:
     compose_file: docker-compose.yaml
@@ -30,9 +18,7 @@ namespace:
     port: "3000"
 
 service:
-  local_data:
-    namespace:
-      target: local_data
+  local_data: True
 
   ollama: True
 
@@ -43,7 +29,7 @@ action:
     params:
       horizontal_rule: True
       obj:
-        - SOS-Nano_LLM_Studio: ${meta.system_description}
+        - SOS-Ollama_WebUI: ${meta.system_description}
         - Install:
           - sos-toolkit setup
           - sos-toolkit install
@@ -52,40 +38,23 @@ action:
         - Stop:
           - sos-toolkit down
         - Config:
-          - Change Ollama Model Directory: sos-toolkit config --target service.ollama.data
+          - Change Ollama Model Directory: sos-toolkit config --target ollama_data
+
+  sos_config:
+    ollama_data:
+      tool: terminal.input_prompt
+      params:
+        prompt: "Set Ollama Data Directory: "
+      result_map:
+        - label: set ollama_data
+          result: namespace.ollama_data
+          data: input
+      callbacks:
+        - ${action.set_ollama_data}
 
   sos_setup:
     ollama_setup: ${service.ollama.action.setup}
     local_data: ${service.local_data.action.setup}
-
-    ollama_data:
-      local_target:
-        label: generate ollama data directory
-        tool: context.ctx_set
-        params:
-          ctx_key: __TARGET__
-          overwrite: True
-        context_map:
-          - label: generate create_child target
-            result: obj
-            data:
-              - target: folder
-                source: null
-                default: ollama_data
-              - target: name
-                source: null
-                default: ollama_data
-      create_child: ${service.local_data.action.create_child}
-      update_ollama_data:
-        label: set ollama service data directory
-        tool: context.ctx_set
-        params:
-          ctx_key: service.ollama.namespace.model_dir
-          overwrite: True
-        context_map:
-          - label: get model_dir
-            result: obj
-            data: service.local_data.namespace.child_map.ollama_data
 
   sos_install:
     pull_frontend_image:
@@ -115,6 +84,7 @@ action:
             comparison: equal
             raise_exc: False
 
+    ollama_data: ${action.set_ollama_data}
     download_models: ${action.download_models}
 
   sos_up:
@@ -254,6 +224,76 @@ action:
           result: target
           data: namespace.model_list
     ollama_down: ${service.ollama.action.down}
+
+  set_ollama_data:
+    create_target:
+      label: generate ollama data directory
+      tool: context.ctx_set
+      condition:
+        - label: ollama_data exists
+          ctx_key: namespace.ollama_data
+          valid: null
+          is_inverse: False
+          raise_exc: False
+      params:
+        ctx_key: __TARGET__
+        overwrite: True
+      context_map:
+        - label: generate create_child target
+          result: obj
+          data:
+            - target: folder
+              source: null
+              default: ollama_data
+            - target: name
+              source: null
+              default: ollama_data
+      callbacks:
+        - ${service.local_data.action.create_child}
+        - label: set ollama service data directory
+          tool: context.ctx_set
+          params:
+            ctx_key: service.ollama.namespace.model_dir
+            overwrite: True
+          context_map:
+            - label: get model_dir
+              result: obj
+              data: service.local_data.namespace.child_map.ollama_data
+        - label: generate model_dir break
+          tool: context.runtime_break
+          context_map:
+            - label: generate info_break
+              result: info_break
+              data:
+                - target: model_dir
+                  source: service.ollama.namespace.model_dir
+              format_string: "GENERATED OLLAMA MODEL DIR: {model_dir}"
+    provided_target:
+      label: map ollama data directory
+      tool: context.ctx_set
+      condition:
+        - label: ollama_data exists
+          ctx_key: namespace.ollama_data
+          valid: null
+          is_inverse: True
+          raise_exc: False
+      params:
+        ctx_key: service.ollama.namespace.model_dir
+        overwrite: True
+      context_map:
+        - label: get ollama data_dir
+          result: obj
+          data: namespace.ollama_data
+      callbacks:
+        - label: generate model_dir break
+          tool: context.runtime_break
+          context_map:
+            - label: generate info_break
+              result: info_break
+              data:
+                - target: model_dir
+                  source: service.ollama.namespace.model_dir
+              format_string: "PROVIDED OLLAMA MODEL DIR: {model_dir}"
 
 hook:
   on_context_load:
