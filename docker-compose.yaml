@@ -1,0 +1,21 @@
+networks:
+  ollama_serve:
+    external: True
+
+services:
+  frontend:
+    image: ${FRONTEND_IMAGE}
+    pull_policy: never
+    hostname: ollama_webui-frontend
+
+    networks:
+      - ${OLLAMA_NETWORK}
+
+    ports:
+      - ${FRONTEND_PORT}:8080
+
+    environment:
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL}
+
+    volumes:
+      - ${LOCAL_DATA_PATH}/webui:/app/backend/data
